@@ -3,16 +3,16 @@
 #include <Arduino.h>
 #include <SensirionI2CSen5x.h>
 #include <std_msgs/Int8.h>
-#include <std_msgs/Int32MultiArray.h>
+#include <std_msgs/Float32MultiArray.h>
 
-#define DATA_LENGTH 4 // 실제로 보낼 데이터 길이
+#define DATA_LENGTH 4 
 
 SensirionI2CSen5x sen5x;
 
 const int16_t SEN50_ADDRESS = 0x69;
 
 ros::NodeHandle nh;
-std_msgs::Int32MultiArray SEN50_send;
+std_msgs::Float32MultiArray SEN50_send;
 ros::Publisher SEN50_SEND_Data("SEN50_topic", &SEN50_send);
 
 int CONT_1 = 11;
@@ -76,16 +76,16 @@ void SEN50_data() {
   float vocIndex;
   float noxIndex;
 
-  error = sen5x.readMeasuredValues(
+  sen5x.readMeasuredValues(
         massConcentrationPm1p0, massConcentrationPm2p5, massConcentrationPm4p0,
         massConcentrationPm10p0, ambientHumidity, ambientTemperature, vocIndex,
         noxIndex);
 
-
-  SEN50_send.data[0] = static_cast<int32_t>(massConcentrationPm1p0 * 1000); // 부동 소수점 변환 예시
-  SEN50_send.data[1] = static_cast<int32_t>(massConcentrationPm2p5 * 1000);
-  SEN50_send.data[2] = static_cast<int32_t>(massConcentrationPm4p0 * 1000);
-  SEN50_send.data[3] = static_cast<int32_t>(massConcentrationPm10p0 * 1000);
+  SEN50_send.data.clear();
+  SEN50_send.data.push_back(massConcentrationPm1p0);
+  SEN50_send.data.push_back(massConcentrationPm2p5);
+  SEN50_send.data.push_back(massConcentrationPm4p0);
+  SEN50_send.data.push_back(massConcentrationPm10p0);
 
   SEN50_SEND_Data.publish(&SEN50_send);
 
