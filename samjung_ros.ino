@@ -1,9 +1,13 @@
 #include <ros.h> 
 #include <Wire.h>
 #include <Arduino.h>
+#include <SensirionI2CSen5x.h>
 #include <std_msgs/Int8.h>
 #include <std_msgs/Int32MultiArray.h>
 
+#define DATA_LENGTH 4 // 실제로 보낼 데이터 길이
+
+SensirionI2CSen5x sen5x;
 
 const int16_t SEN50_ADDRESS = 0x69;
 
@@ -30,8 +34,6 @@ void CM300_Mode(const std_msgs::Int8& msg) {
     
     if (CONT_L >= 1 && CONT_L <= 4) {
       CONT_Log = CONT_L;
-      //Serial.print("Valid input: ");
-      //Serial.println(CONT_Log);
       
       switch(CONT_Log) {
         case 1:
@@ -52,10 +54,6 @@ void CM300_Mode(const std_msgs::Int8& msg) {
           break;
       }
     }
-    
-//    while(Serial.available() > 0) {
-//      Serial.read();
-//    }
   }
 
 
@@ -63,53 +61,35 @@ ros::Subscriber<std_msgs::Int8> control_level("CM300_topic", CM300_Mode);
 
 
 void SEN50_data() { 
-  uint16_t pm1p0, pm2p5, pm4p0, pm10p0;
-  int16_t voc, nox, humidity, temperature;
-  uint8_t data[24], counter;
+  uint16_t error;
+  char errorMessage[256];
 
-  // Send command to read measurement data (0x03C4)
-  Wire.beginTransmission(SEN50_ADDRESS);
-  Wire.write(0x03);
-  Wire.write(0xC4);
-  Wire.endTransmission();
-  // Wait 20 ms to allow the sensor to fill the internal buffer
-  delay(20);
+  delay(1000);
 
-  // Read measurement data of SEN55, after two bytes a CRC follows
-  Wire.requestFrom(SEN50_ADDRESS, 24);
-  counter = 0;
-  
-  while (Wire.available()) {
-    data[counter++] = Wire.read();
-  }
+  // Read Measurement
+  float massConcentrationPm1p0;
+  float massConcentrationPm2p5;
+  float massConcentrationPm4p0;
+  float massConcentrationPm10p0;
+  float ambientHumidity;
+  float ambientTemperature;
+  float vocIndex;
+  float noxIndex;
 
-  // PM1.0 to PM10 are unscaled unsigned integer values in ug / um3
-  // VOC level is a signed int and scaled by a factor of 10 and needs to be divided by 10
-  // humidity is a signed int and scaled by 100 and need to be divided by 100
-  // temperature is a signed int and scaled by 200 and need to be divided by 200
-  pm1p0 = (uint16_t)data[0] << 8 | data[1];
-  pm2p5 = (uint16_t)data[3] << 8 | data[4];
-  pm4p0 = (uint16_t)data[6] << 8 | data[7];
-  pm10p0 = (uint16_t)data[9] << 8 | data[10];
-  humidity = (uint16_t)data[12] << 8 | data[13];
-  temperature = (uint16_t)data[15] << 8 | data[16];
-  voc = (uint16_t)data[18] << 8 | data[19];
-  nox = (uint16_t)data[21] << 8 | data[22];
+  error = sen5x.readMeasuredValues(
+        massConcentrationPm1p0, massConcentrationPm2p5, massConcentrationPm4p0,
+        massConcentrationPm10p0, ambientHumidity, ambientTemperature, vocIndex,
+        noxIndex);
 
 
-  SEN50_send.data[0] = float(pm1p0) / 10;
-  SEN50_send.data[1] = float(pm2p5) / 10;
-  SEN50_send.data[2] = float(pm4p0) / 10;
-  SEN50_send.data[3] = float(pm10p0) / 10;
-  SEN50_send.data[4] = float(voc) / 10;
-  SEN50_send.data[5] = float(nox) / 10;
-  SEN50_send.data[6] = float(humidity) / 100;
-  SEN50_send.data[7] = float(temperature) / 200;
+  SEN50_send.data[0] = static_cast<int32_t>(massConcentrationPm1p0 * 1000); // 부동 소수점 변환 예시
+  SEN50_send.data[1] = static_cast<int32_t>(massConcentrationPm2p5 * 1000);
+  SEN50_send.data[2] = static_cast<int32_t>(massConcentrationPm4p0 * 1000);
+  SEN50_send.data[3] = static_cast<int32_t>(massConcentrationPm10p0 * 1000);
 
   SEN50_SEND_Data.publish(&SEN50_send);
 
 }
-
 
 void led_control(int lpin, unsigned long onTime, unsigned long offTime) {
   unsigned long currentMillis = millis();
@@ -144,11 +124,15 @@ void setup() {
   digitalWrite(led_MOSFET2, LOW);
   digitalWrite(led_MOSFET3, LOW);
   
-  Serial.begin(9600);
+  Serial.begin(115200);
   while(!Serial);
 
   Wire.begin();
-  delay(50);
+  sen5x.begin(Wire);
+
+  sen5x.deviceReset();
+  sen5x.setTemperatureOffsetSimple(0.0);
+  sen5x.startMeasurement();
 
   Wire.beginTransmission(SEN50_ADDRESS);
   Wire.write(0x00);
