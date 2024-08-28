@@ -2,13 +2,13 @@
 #include <Wire.h>
 #include <Arduino.h>
 #include <std_msgs/Int8.h>
-#include <std_msgs/Float32MultiArray.h>
+#include <std_msgs/Int32MultiArray.h>
 
 
 const int16_t SEN50_ADDRESS = 0x69;
 
 ros::NodeHandle nh;
-std_msgs::Float32MultiArray SEN50_send;
+std_msgs::Int32MultiArray SEN50_send;
 ros::Publisher SEN50_SEND_Data("SEN50_topic", &SEN50_send);
 
 int CONT_1 = 11;
@@ -133,8 +133,8 @@ void setup() {
   nh.advertise(SEN50_SEND_Data);
 
   SEN50_send.data_length = 8; 
-  SEN50_send.data = (float *)malloc(sizeof(float) * 8);
-  
+  SEN50_send.data = (int32_t *)malloc(sizeof(int32_t) * 8); 
+
   pinMode(CONT_1, OUTPUT);
   pinMode(CONT_2, OUTPUT);
   pinMode(led_MOSFET1, OUTPUT);
@@ -161,32 +161,28 @@ void loop() {
 
   if (cur_time - previousTime >= 50) { // 100ms
     previousTime = cur_time;
-    //SEN50_data();
     Serial.print("Valid input: ");
-    //sdl_num++;
-//
-//    switch (sdl_num) {
-//      case 0:
-//        break;
-//      case 1:
-//        nh.spinOnce();  // ROS 
-//        break;
-//      case 2:
-//        SEN50_data();   
-//        break;
-//      case 3:
-//        SEN50_SEND_Data.publish(&SEN50_send);
-//        break;
-//      case 4:
-//        led_control(led_MOSFET1, 1000, 200);  // LED 
-//        break;
-//      case 5:
-//        led_control(led_MOSFET2, 1000, 200);  // LED 
-//        break;
-//      case 6:
-//        led_control(led_MOSFET3, 1000, 200);  // LED 
-//        sdl_num = 0;  
-//        break;
-//    }
+    sdl_num++;
+
+    switch (sdl_num) {
+      case 0:
+        break;
+      case 1:
+        nh.spinOnce();  // ROS 
+        break;
+      case 2:
+        SEN50_data();   
+        break;
+      case 3:
+        led_control(led_MOSFET1, 1000, 200);  // LED 
+        break;
+      case 4:
+        led_control(led_MOSFET2, 1000, 200);  // LED 
+        break;
+      case 5:
+        led_control(led_MOSFET3, 1000, 200);  // LED 
+        sdl_num = 0;  
+        break;
+    }
   }
 }
