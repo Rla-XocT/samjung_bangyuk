@@ -2,13 +2,14 @@
 #include <Wire.h>
 #include <Arduino.h>
 #include <std_msgs/Int8.h>
-#include <std_msgs/String.h>
+#include <std_msgs/Float32MultiArray.h>
 
 
 const int16_t SEN50_ADDRESS = 0x69;
 
 ros::NodeHandle nh;
-std_msgs::String SEN50_send;
+std_msgs::Float32MultiArray SEN50_send;
+ros::Publisher SEN50_SEND_Data("SEN50_topic", &SEN50_send);
 
 int CONT_1 = 11;
 int CONT_2 = 12;
@@ -22,6 +23,8 @@ int sdl_num = 0;
 unsigned long previousTime = 0;
 unsigned long ledPreviousTime = 0; 
 bool ledState = LOW;
+
+int CONT_Log = 0;  // 마지막으로 유효한 입력을 저장
 
 void CM300_Mode() {
   if (Serial.available() > 0) {
@@ -104,29 +107,22 @@ void SEN50_data() {    // 센서데이터 ROS로 받을거면 이렇게 할게 �
   nox = (uint16_t)data[21] << 8 | data[22];
 
 
-  // Print output
-  Serial.print(String(float(pm1p0) / 10));
-  Serial.print("\t");
-  Serial.print(String(float(pm2p5) / 10));
-  Serial.print("\t");
-  Serial.print(String(float(pm4p0) / 10));
-  Serial.print("\t");
-  Serial.print(String(float(pm10p0) / 10));
-  Serial.print("\t");
-  Serial.print(String(float(voc) / 10));
-  Serial.print("\t\t");
-  Serial.print(String(float(nox) / 10));
-  Serial.print("\t\t");
-  Serial.print(String(float(humidity) / 100));
-  Serial.print("\t");
-  Serial.print(String(float(temperature) / 200));
-  Serial.println();
+  // 데이터를 Float32MultiArray 메시지에 할당
+  SEN50_send.data[0] = float(pm1p0) / 10;
+  SEN50_send.data[1] = float(pm2p5) / 10;
+  SEN50_send.data[2] = float(pm4p0) / 10;
+  SEN50_send.data[3] = float(pm10p0) / 10;
+  SEN50_send.data[4] = float(voc) / 10;
+  SEN50_send.data[5] = float(nox) / 10;
+  SEN50_send.data[6] = float(humidity) / 100;
+  SEN50_send.data[7] = float(temperature) / 200;
+
+  SEN50_SEND_Data.publish(&SEN50_send);
 
   // Wait 1 s for next measurement
   delay(1000);
 
 }
-ros::Publisher SEN50_SEND_Data("SEN50_topic", &SEN50_send);
 
 
 void led_control(int lpin, unsigned long onTime, unsigned long offTime) {
@@ -149,6 +145,9 @@ void setup() {
   nh.initNode();
   nh.subscribe(control_level);
   nh.advertise(SEN50_SEND_Data);
+
+  SEN50_send.data_length = 8;  // 8개의 데이터를 보낼 것이므로
+  SEN50_send.data = (float *)malloc(sizeof(float) * 8);
   
   pinMode(CONT_1, OUTPUT);
   pinMode(CONT_2, OUTPUT);
@@ -201,7 +200,7 @@ void loop() {
         break;
       case 5:
         led_control(led_MOSFET3, 1000, 200);  // LED 제어
-        sdl_num = 0;  // 순환 리셋
+        sdl_num = -1;  // 순환 리셋
         break;
     }
   }
