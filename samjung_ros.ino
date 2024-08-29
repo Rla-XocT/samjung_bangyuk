@@ -102,6 +102,7 @@ void setup() {
   nh.initNode();
   nh.subscribe(control_level);
   nh.advertise(SEN50_SEND_Data);
+  nh.getHardware()->setBaud(115200);
 
   SEN50_send.data_length = 4; // 사용할 데이터 길이 설정
   SEN50_send.data = (float *)malloc(sizeof(float) * SEN50_send.data_length);
